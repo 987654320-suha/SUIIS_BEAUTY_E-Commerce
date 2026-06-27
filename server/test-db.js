@@ -1,7 +1,7 @@
 // E:\scroll-animation\server\test-db.js
 import mongoose from "mongoose";
 
-const uri = "mongodb+srv://suhanisshinde111_db_user:s1u8h1a2n0i4@cluster0.v7wjrpi.mongodb.net/?retryWrites=true&w=majority";
+const uri = process.env.MONGO_URI;
 
 async function test() {
   console.log("Testing MongoDB Atlas Connection...");
