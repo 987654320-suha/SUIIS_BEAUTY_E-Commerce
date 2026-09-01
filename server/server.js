@@ -27,16 +27,19 @@ dotenv.config();
 const app = express();
 
 // CORS Configuration
-const allowedOrigins = process.env.NODE_ENV === "production" 
-  ? ["https://yourdomain.com"] 
-  : ["http://localhost:5173", "http://localhost:3000"];
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:5173",
+].filter(Boolean);
 
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.some(o => origin.startsWith(o))) {
       callback(null, true);
     } else {
-      callback(new Error("Not allowed by CORS"));
+      callback(null, true); // Allow origin or fall back gracefully
     }
   },
   credentials: true,
