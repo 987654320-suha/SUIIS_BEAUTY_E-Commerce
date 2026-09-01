@@ -1,178 +1,295 @@
-import axios from "axios";
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import apiClient from "../api/apiClient";
 
 const AuthContext = createContext();
 
-const DEMO_USER = {
-  id: "u001", name: "Priya Sharma", email: "priya@email.com",
-  phone: "9876543210", avatar: null, role: "customer",
-  joinDate: "January 2024", loyaltyTier: "Gold",
-};
-
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-
-  const saved =
-    localStorage.getItem("suiisUser");
-
-  return saved
-    ? JSON.parse(saved)
-    : null;
-
-});
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [otpSent, setOtpSent] = useState(false);
 
-const login = useCallback(async (email, password) => {
-  try {
+  // Validate session on app initialization
+  useEffect(() => {
+    let isMounted = true;
 
-    setLoading(true);
+    const validateSession = async () => {
+      const token = localStorage.getItem("token");
 
-    const { data } = await axios.post(
-      "http://localhost:5000/api/users/login",
-      {
-        email,
-        password
+      if (!token) {
+        localStorage.removeItem("suiisUser");
+        if (isMounted) {
+          setUser(null);
+          setLoading(false);
+        }
+        return;
       }
-    );
 
-    console.log("LOGIN RESPONSE:", data);
+      try {
+        const { data } = await apiClient.get("/api/auth/profile");
+        const authenticatedUser = data.user || data;
 
-    localStorage.setItem(
-      "suiisUser",
-      JSON.stringify(data)
-    );
-
-    setUser(data);
-
-    setLoading(false);
-
-    return { success: true };
-
-  } catch (error) {
-
-    setLoading(false);
-
-    return {
-      success: false,
-      error:
-        error.response?.data?.message ||
-        "Login failed"
+        if (isMounted) {
+          localStorage.setItem("suiisUser", JSON.stringify(authenticatedUser));
+          setUser(authenticatedUser);
+        }
+      } catch (err) {
+        console.warn("[Auth] Session validation failed:", err.response?.data?.message || err.message);
+        localStorage.removeItem("token");
+        localStorage.removeItem("suiisUser");
+        if (isMounted) {
+          setUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
     };
-  }
-}, []);
 
-  const loginWithGoogle = useCallback(async () => {
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 700));
-    setUser({ ...DEMO_USER, email: "priya@gmail.com", name: "Priya (Google)" });
-    setLoading(false);
-    return { success: true };
+    validateSession();
+
+    // Listen for unauthorized events emitted by apiClient interceptor
+    const handleUnauthorized = () => {
+      if (isMounted) {
+        setUser(null);
+        setLoading(false);
+      }
+    };
+
+    window.addEventListener("suiis:unauthorized", handleUnauthorized);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("suiis:unauthorized", handleUnauthorized);
+    };
   }, []);
 
-  const loginWithFacebook = useCallback(async () => {
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 700));
-    setUser({ ...DEMO_USER, email: "priya@facebook.com", name: "Priya (Facebook)" });
-    setLoading(false);
-    return { success: true };
-  }, []);
+  // Standard email/password login
+  const login = useCallback(async (email, password) => {
+    try {
+      setLoading(true);
+      const { data } = await apiClient.post("/api/auth/login", { email, password });
 
-  const sendOTP = useCallback(async (phone) => {
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    setOtpSent(true);
-    setLoading(false);
-    return { success: true };
-  }, []);
+      const token = data.token;
+      const authenticatedUser = data.user || data;
 
-  const verifyOTP = useCallback(async (otp) => {
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 700));
-    // Demo: OTP 123456 always works
-    if (otp === "123456") {
-      setUser({ ...DEMO_USER });
+      if (token) {
+        localStorage.setItem("token", token);
+        localStorage.setItem("suiisUser", JSON.stringify(authenticatedUser));
+        setUser(authenticatedUser);
+      }
+
       setLoading(false);
-      return { success: true };
+      return { success: true, data: authenticatedUser };
+    } catch (error) {
+      setLoading(false);
+      return {
+        success: false,
+        error: error.response?.data?.message || "Login failed. Please check your credentials.",
+      };
     }
-    setLoading(false);
-    return { success: false, error: "Invalid OTP. Use 123456" };
   }, []);
 
-const register = useCallback(async (data) => {
-  try {
+  // Standard registration
+  const register = useCallback(async (formData) => {
+    try {
+      setLoading(true);
+      const { data } = await apiClient.post("/api/auth/register", formData);
 
-    setLoading(true);
+      const token = data.token;
+      const authenticatedUser = data.user || data;
 
-    const response = await axios.post(
-      "http://localhost:5000/api/auth/register",
-      {
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        password: data.password
+      if (token) {
+        localStorage.setItem("token", token);
+        localStorage.setItem("suiisUser", JSON.stringify(authenticatedUser));
+        setUser(authenticatedUser);
       }
-    );
 
-    setLoading(false);
-
-    return {
-      success: true,
-      data: response.data
-    };
-
-  } catch (error) {
-
-    setLoading(false);
-
-    return {
-      success: false,
-      error:
-        error.response?.data?.message ||
-        "Registration failed"
-    };
-  }
-}, []);
-
-const logout = useCallback(() => {
-
-  localStorage.removeItem(
-    "suiisUser"
-  );
-
-  setUser(null);
-
-  setOtpSent(false);
-
-}, []);
-
-  const updateProfile = useCallback(async (data) => {
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-    setUser(prev => ({ ...prev, ...data }));
-    setLoading(false);
-    return { success: true };
+      setLoading(false);
+      return { success: true, data: authenticatedUser };
+    } catch (error) {
+      setLoading(false);
+      return {
+        success: false,
+        error: error.response?.data?.message || "Registration failed.",
+      };
+    }
   }, []);
 
+  // Social login - Google
+  const loginWithGoogle = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data } = await apiClient.post("/api/auth/google", { tokenId: "demo_google_token" });
+
+      const token = data.token;
+      const authenticatedUser = data.user || data;
+
+      if (token) {
+        localStorage.setItem("token", token);
+        localStorage.setItem("suiisUser", JSON.stringify(authenticatedUser));
+        setUser(authenticatedUser);
+      }
+
+      setLoading(false);
+      return { success: true, data: authenticatedUser };
+    } catch (error) {
+      setLoading(false);
+      return {
+        success: false,
+        error: error.response?.data?.message || "Google login failed.",
+      };
+    }
+  }, []);
+
+  // Social login - Facebook
+  const loginWithFacebook = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data } = await apiClient.post("/api/auth/facebook", { accessToken: "demo_facebook_token" });
+
+      const token = data.token;
+      const authenticatedUser = data.user || data;
+
+      if (token) {
+        localStorage.setItem("token", token);
+        localStorage.setItem("suiisUser", JSON.stringify(authenticatedUser));
+        setUser(authenticatedUser);
+      }
+
+      setLoading(false);
+      return { success: true, data: authenticatedUser };
+    } catch (error) {
+      setLoading(false);
+      return {
+        success: false,
+        error: error.response?.data?.message || "Facebook login failed.",
+      };
+    }
+  }, []);
+
+  // Send OTP (Phone or Email)
+  const sendOTP = useCallback(async (payload) => {
+    try {
+      setLoading(true);
+      const body = typeof payload === "string" ? { phone: payload } : payload;
+      const endpoint = body.email ? "/api/auth/send-otp-email" : "/api/auth/send-otp-phone";
+      const { data } = await apiClient.post(endpoint, body);
+
+      setOtpSent(true);
+      setLoading(false);
+      return { success: true, data };
+    } catch (error) {
+      setLoading(false);
+      return {
+        success: false,
+        error: error.response?.data?.message || "Failed to send OTP.",
+      };
+    }
+  }, []);
+
+  // Verify OTP and authenticate
+  const verifyOTP = useCallback(async (payload) => {
+    try {
+      setLoading(true);
+      const body = typeof payload === "string" 
+        ? { phone: "9876543210", otp: payload } 
+        : payload;
+
+      const { data } = await apiClient.post("/api/auth/verify-otp-login", body);
+
+      const token = data.token;
+      const authenticatedUser = data.user || data;
+
+      if (token) {
+        localStorage.setItem("token", token);
+        localStorage.setItem("suiisUser", JSON.stringify(authenticatedUser));
+        setUser(authenticatedUser);
+      }
+
+      setLoading(false);
+      return { success: true, data: authenticatedUser };
+    } catch (error) {
+      setLoading(false);
+      return {
+        success: false,
+        error: error.response?.data?.message || "Invalid OTP. Use 123456 for demo.",
+      };
+    }
+  }, []);
+
+  // Logout
+  const logout = useCallback(async () => {
+    try {
+      await apiClient.post("/api/auth/logout");
+    } catch {
+      // Ignore network errors on logout
+    } finally {
+      localStorage.removeItem("token");
+      localStorage.removeItem("suiisUser");
+      setUser(null);
+      setOtpSent(false);
+    }
+  }, []);
+
+  // Update profile
+  const updateProfile = useCallback(async (profileData) => {
+    try {
+      setLoading(true);
+      const { data } = await apiClient.put("/api/auth/profile", profileData);
+      const updatedUser = data.user || data;
+      localStorage.setItem("suiisUser", JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      setLoading(false);
+      return { success: true, data: updatedUser };
+    } catch (error) {
+      setLoading(false);
+      return {
+        success: false,
+        error: error.response?.data?.message || "Failed to update profile.",
+      };
+    }
+  }, []);
+
+  // Forgot password
   const forgotPassword = useCallback(async (email) => {
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    setLoading(false);
-    return { success: true };
+    try {
+      setLoading(true);
+      const { data } = await apiClient.post("/api/auth/forgot-password", { email });
+      setLoading(false);
+      return { success: true, data };
+    } catch (error) {
+      setLoading(false);
+      return {
+        success: false,
+        error: error.response?.data?.message || "Failed to process forgot password request.",
+      };
+    }
   }, []);
 
   const isAdmin = user?.role === "admin";
   const isSeller = user?.role === "seller" || user?.role === "admin";
 
   return (
-    <AuthContext.Provider value={{
-      user, loading, otpSent,
-      login, loginWithGoogle, loginWithFacebook,
-      sendOTP, verifyOTP,
-      register, logout, updateProfile, forgotPassword,
-      isAdmin, isSeller,
-      isLoggedIn: !!user,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        otpSent,
+        login,
+        loginWithGoogle,
+        loginWithFacebook,
+        sendOTP,
+        verifyOTP,
+        register,
+        logout,
+        updateProfile,
+        forgotPassword,
+        isAdmin,
+        isSeller,
+        isLoggedIn: !!user,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,11 +1,24 @@
 # Dependencies
 node_modules/
 server/node_modules/
+venv/
+ai/venv/
+__pycache__/
+*.pyc
 
 # Environment files
 .env
+.env.*
 server/.env
+server/.env.*
 client/.env
+client/.env.*
+
+# Uploads & Temp files
+server/uploads/skin/*
+!server/uploads/skin/.gitkeep
+server/uploads/*
+!server/uploads/.gitkeep
 
 # Logs
 *.log
@@ -15,8 +28,9 @@ npm-debug.log*
 dist/
 build/
 
-# VS Code
+# VS Code & IDEs
 .vscode/
+.idea/
 
 # OS
 .DS_Store

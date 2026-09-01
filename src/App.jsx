@@ -1,10 +1,12 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ScrollProgress from "./components/ScrollProgress";
 import ChatBot from "./components/ChatBot";
+import FloatingVoiceButton from "./components/VoiceConsultant/FloatingVoiceButton";
+import VoiceConsultantModal from "./components/VoiceConsultant/VoiceConsultantModal";
 import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import Shop from "./pages/Shop";
@@ -34,6 +36,8 @@ import AdminCoupons from "./pages/admin/AdminCoupons";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import SellerDashboard from "./pages/seller/SellerDashboard";
 import NotFound from "./pages/NotFound";
+import AIBeauty from "./pages/AIBeauty";
+import BeautyDNA from "./pages/BeautyDNA";
 
 // ========== PROTECTED ROUTE COMPONENT ==========
 const ProtectedRoute = ({ children }) => {
@@ -143,32 +147,50 @@ const SellerRoute = ({ children }) => {
   return children;
 };
 
-function ScrollToTop() {
+// ========== SCROLL TO TOP COMPONENT ==========
+const ScrollToTop = () => {
   const { pathname } = useLocation();
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [pathname]);
+  useEffect(() => { 
+    window.scrollTo({ top: 0, behavior: "instant" }); 
+  }, [pathname]);
   return null;
-}
+};
 
-function GrainOverlay() {
+// ========== GRAIN OVERLAY COMPONENT ==========
+const GrainOverlay = () => {
   return (
     <div aria-hidden="true" style={{
-      position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9997, opacity: 0.025,
+      position: "fixed", 
+      inset: 0, 
+      pointerEvents: "none", 
+      zIndex: 9997, 
+      opacity: 0.025,
       backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
       backgroundSize: "200px 200px",
     }} />
   );
-}
+};
 
-function AppInner() {
+// ========== MAIN APP INNER COMPONENT ==========
+const AppInner = () => {
   const { pathname } = useLocation();
   const { user } = useAuth();
-  
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+
+  console.log("Current User:", user);
+
   // Check if current route is admin or seller
-  const isAdminOrSeller = pathname.startsWith("/admin") || pathname.startsWith("/seller");
-  const isAuthPage = pathname === "/auth" || pathname === "/login" || pathname === "/register" || 
-                     pathname.startsWith("/verify-email") || pathname.startsWith("/reset-password") ||
-                     pathname === "/forgot-password";
-  
+  const isAdminOrSeller =
+    pathname.startsWith("/admin") || pathname.startsWith("/seller");
+
+  const isAuthPage =
+    pathname === "/auth" ||
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname.startsWith("/verify-email") ||
+    pathname.startsWith("/reset-password") ||
+    pathname === "/forgot-password";
+
   return (
     <>
       <GrainOverlay />
@@ -311,6 +333,14 @@ function AppInner() {
               <AdminAnalytics />
             </AdminRoute>
           } />
+
+          {/* AI & Beauty Routes */}
+          <Route path="/ai-beauty" element={<AIBeauty />} />
+          <Route path="/beauty-dna" element={
+            <ProtectedRoute>
+              <BeautyDNA />
+            </ProtectedRoute>
+          } />
           
           {/* Seller Routes */}
           <Route path="/seller" element={
@@ -323,14 +353,30 @@ function AppInner() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
+
+      {/* AI Voice Consultant Components */}
+      {!isAdminOrSeller && !isAuthPage && (
+        <>
+          <FloatingVoiceButton
+            onClick={() => setVoiceModalOpen(true)}
+            isOpen={voiceModalOpen}
+          />
+          <VoiceConsultantModal
+            isOpen={voiceModalOpen}
+            onClose={() => setVoiceModalOpen(false)}
+          />
+        </>
+      )}
+
       {/* Show Footer only for authenticated users on non-auth pages */}
       {user && !isAdminOrSeller && !isAuthPage && <Footer />}
       {/* Show ChatBot only for authenticated users on non-auth pages */}
       {user && !isAdminOrSeller && !isAuthPage && <ChatBot />}
     </>
   );
-}
+};
 
+// ========== MAIN APP COMPONENT ==========
 export default function App() {
   return (
     <Router>

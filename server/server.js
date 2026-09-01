@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
-console.log("SERVER KEY:", process.env.RESEND_API_KEY);
+console.log("RESEND:", process.env.RESEND_API_KEY ? "Loaded" : "Missing");
+console.log("GEMINI:", process.env.GEMINI_API_KEY ? "Loaded" : "Missing");
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -15,6 +16,9 @@ import wishlistRoutes from "./routes/wishlistRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import couponRoutes from "./routes/couponRoutes.js";
 import addressRoutes from "./routes/addressRoutes.js";
+
+import path from "path";
+import aiRoutes from "./routes/aiRoutes.js";
 
 // LOAD ENV FIRST
 dotenv.config();
@@ -43,7 +47,10 @@ app.use(cors({
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
+app.use(
+  "/uploads",
+  express.static(path.join(process.cwd(), "uploads"))
+);
 // Request logging middleware (for development)
 if (process.env.NODE_ENV !== "production") {
   app.use((req, res, next) => {
@@ -62,7 +69,7 @@ app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/addresses", addressRoutes);
-
+app.use("/api/ai", aiRoutes);
 // Health check route
 app.get("/health", (req, res) => {
   res.status(200).json({ 
@@ -103,17 +110,21 @@ const PORT = process.env.PORT || 5000;
 
 // Database Connection & Server Start
 const startServer = async () => {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📦 Environment: ${process.env.NODE_ENV || "development"}`);
+  });
+
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("✅ MongoDB Connected Successfully");
-    
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-      console.log(`📦 Environment: ${process.env.NODE_ENV || "development"}`);
-    });
+    if (process.env.MONGO_URI) {
+      await mongoose.connect(process.env.MONGO_URI);
+      console.log("✅ MongoDB Connected Successfully");
+    } else {
+      console.warn("⚠️ MONGO_URI is not defined in .env");
+    }
   } catch (error) {
     console.error("❌ Database Connection Failed:", error.message);
-    process.exit(1);
+    console.log("👉 Tip: Ensure your current IP is whitelisted in MongoDB Atlas (Network Access -> Add IP Address / Allow Access from Anywhere 0.0.0.0/0).");
   }
 };
 

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCart, useWishlist } from "../context/CartContext";
+import { ALL_PRODUCTS } from "../data/products";
 import { useAuth } from "../context/AuthContext";
-
-
 
 const NAV_LINKS = [
   { label: "Home", path: "/" },
@@ -22,10 +21,11 @@ const NAV_LINKS = [
   },
   { label: "Bestsellers", path: "/shop?filter=bestseller" },
   { label: "New In", path: "/shop?filter=new" },
+  { label: "BeautyDNA", path: "/ai-beauty" },
+  { label: "🎙️ Voice Expert", path: "/ai-beauty", isNew: true },
 ];
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [megaOpen, setMegaOpen] = useState(false);
@@ -35,6 +35,10 @@ export default function Navbar() {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Import user from AuthContext
+  const { user } = useAuth();
+  
   const { cart, cartCount, cartTotal, removeFromCart, updateQty } = useCart();
   const { wishlist } = useWishlist();
   const searchRef = useRef(null);
@@ -186,6 +190,19 @@ export default function Navbar() {
                   onMouseLeave={e => { if (!isActive(link.path)) e.currentTarget.style.color = "var(--clr-text-2)"; }}
                 >
                   {link.label}
+                  {link.isNew && (
+                    <span style={{
+                      fontFamily: "var(--font-body)",
+                      fontSize: "8px",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      color: "var(--clr-bg)",
+                      background: "var(--clr-accent)",
+                      padding: "2px 5px",
+                      borderRadius: "2px",
+                      lineHeight: 1,
+                    }}>NEW</span>
+                  )}
                   {link.mega && (
                     <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style={{ opacity: 0.5 }}>
                       <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -330,19 +347,25 @@ export default function Navbar() {
 
             {/* Account */}
             <Link
-              to={user ? "/profile" : "/login"}
+              to={user ? "/profile" : "/auth"}
               aria-label="Account"
               className="hide-mobile"
               style={{
-                width: 40, height: 40, display: "flex", alignItems: "center",
-                justifyContent: "center", color: "var(--clr-text-2)",
-                textDecoration: "none", transition: "color 0.2s",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--clr-text-2)",
+                textDecoration: "none",
+                transition: "color 0.2s",
               }}
               onMouseEnter={e => e.currentTarget.style.color = "var(--clr-text)"}
               onMouseLeave={e => e.currentTarget.style.color = "var(--clr-text-2)"}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
               </svg>
             </Link>
 
@@ -395,14 +418,29 @@ export default function Navbar() {
                 <Link
                   to={link.path}
                   style={{
-                    display: "block", padding: "14px 0",
+                    display: "flex", alignItems: "center", gap: "8px", padding: "14px 0",
                     fontFamily: "var(--font-body)", fontSize: "13px",
                     fontWeight: 400, letterSpacing: "0.12em", textTransform: "uppercase",
                     color: isActive(link.path) ? "var(--clr-primary)" : "var(--clr-text-2)",
                     textDecoration: "none",
                     borderBottom: "1px solid var(--clr-divider)",
                   }}
-                >{link.label}</Link>
+                >
+                  {link.label}
+                  {link.isNew && (
+                    <span style={{
+                      fontFamily: "var(--font-body)",
+                      fontSize: "8px",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      color: "var(--clr-bg)",
+                      background: "var(--clr-accent)",
+                      padding: "2px 5px",
+                      borderRadius: "2px",
+                      lineHeight: 1,
+                    }}>NEW</span>
+                  )}
+                </Link>
                 {link.mega && (
                   <div style={{ paddingLeft: "16px", paddingTop: "8px", paddingBottom: "8px" }}>
                     {link.mega.map(sub => (
@@ -431,14 +469,14 @@ export default function Navbar() {
               }}
             >Wishlist ({wishlist.length})</Link>
             <Link
-              to={user ? "/profile" : "/login"}
+              to={user ? "/profile" : "/auth"}
               style={{
                 display: "block", padding: "14px 0",
                 fontFamily: "var(--font-body)", fontSize: "13px",
                 fontWeight: 400, letterSpacing: "0.12em", textTransform: "uppercase",
                 color: "var(--clr-text-2)", textDecoration: "none",
               }}
-            >Account</Link>
+            >{user ? "Profile" : "Account"}</Link>
           </div>
         )}
       </nav>

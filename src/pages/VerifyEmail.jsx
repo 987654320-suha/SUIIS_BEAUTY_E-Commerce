@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import apiClient from "../api/apiClient";
 import { useToast } from "../context/ToastContext";
 
 export default function VerifyEmail() {
@@ -13,16 +13,17 @@ export default function VerifyEmail() {
   useEffect(() => {
     const verifyEmail = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/api/auth/verify-email/${token}`);
+        const response = await apiClient.get(`/api/auth/verify-email/${token}`);
         
         if (response.data.success) {
           setStatus("success");
           setMessage("Email verified successfully!");
           toast.success("Email verified! You can now login.");
           
-          // Store user data
-          localStorage.setItem("suiis_user", JSON.stringify(response.data.user));
-          localStorage.setItem("suiis_token", response.data.token);
+          if (response.data.token) {
+            localStorage.setItem("token", response.data.token);
+            localStorage.setItem("suiisUser", JSON.stringify(response.data.user || response.data));
+          }
           
           setTimeout(() => {
             navigate("/");

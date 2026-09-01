@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 
 // Generate JWT
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || "SECRET_KEY", {
+  return jwt.sign({ id }, process.env.JWT_SECRET || "suiis_secret_key", {
     expiresIn: "30d",
   });
 };
@@ -79,12 +79,17 @@ export const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("-password");
     if (user) {
-      res.json(user);
+      const uObj = user.toObject ? user.toObject() : user;
+      res.json({
+        success: true,
+        user: uObj,
+        ...uObj,
+      });
     } else {
-      res.status(404).json({ message: "User not found" });
+      res.status(401).json({ success: false, message: "User not found" });
     }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -209,7 +214,7 @@ export const forgotPassword = async (req, res) => {
     }
 
     // In production, send actual email with reset token
-    const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "SECRET_KEY", { expiresIn: "1h" });
+    const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "suiis_secret_key", { expiresIn: "1h" });
     
     res.json({ 
       message: "Password reset link sent to email",
@@ -226,7 +231,7 @@ export const forgotPassword = async (req, res) => {
 export const resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "SECRET_KEY");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "suiis_secret_key");
     const user = await User.findById(decoded.id);
 
     if (!user) {

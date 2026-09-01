@@ -6,14 +6,18 @@ import crypto from 'crypto';
 const generateToken = (user) => {
   return jwt.sign(
     { 
-      id: user._id, 
+      id: user._id || user.id, 
       email: user.email, 
       role: user.role || "customer" 
     },
-    process.env.JWT_SECRET || 'your-secret-key',
+    process.env.JWT_SECRET || 'suiis_secret_key',
     { expiresIn: '30d' }
   );
 };
+
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
+import { localUsersStore, initLocalStore } from '../utils/localUserStore.js';
 
 // ========== AUTHENTICATION ==========
 
@@ -21,11 +25,11 @@ const generateToken = (user) => {
 // @route   POST /api/users/register
 // @access  Public
 export const registerUser = async (req, res) => {
-  console.log("🚀 REGISTER FUNCTION CALLED");
+  console.log("🚀 [Auth Register] Request received");
 
   try {
-    console.log("STEP 1: Extracting data");
     const { name, email, password, phone } = req.body;
+    console.log(`[Auth Register] Received registration for email: ${email ? email.trim() : "none"}`);
 
     // Validation
     if (!name || !email || !password || !phone) {
@@ -35,73 +39,126 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    console.log("STEP 2: Checking if user exists");
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({
-        success: false,
-        message: "User already exists with this email"
-      });
-    }
+    const normalizedEmail = email.toLowerCase().trim();
+    const isDbConnected = mongoose.connection.readyState === 1;
 
-    console.log("STEP 3: Checking if phone exists");
-    const phoneExists = await User.findOne({ phone });
-    if (phoneExists) {
-      return res.status(400).json({
-        success: false,
-        message: "Phone number already registered"
-      });
-    }
-
-    console.log("STEP 4: Creating user");
-    const user = await User.create({
-      name,
-      email,
-      password,
-      phone,
-      isEmailVerified: false,
-      role: "customer",
-      loyaltyTier: "Silver",
-      loyaltyPoints: 0,
-      isActive: true,
-      preferences: {
-        newsletter: false,
-        sms: false,
-        push: false
+    if (isDbConnected) {
+      const userExists = await User.findOne({ email: normalizedEmail }).catch(() => null);
+      if (userExists) {
+        return res.status(400).json({
+          success: false,
+          message: "User already exists with this email"
+        });
       }
-    });
 
-    console.log("STEP 5: Generating verification token");
-    const verificationToken = user.generateEmailVerificationToken();
+      const phoneExists = await User.findOne({ phone }).catch(() => null);
+      if (phoneExists) {
+        return res.status(400).json({
+          success: false,
+          message: "Phone number already registered"
+        });
+      }
 
-    console.log("STEP 6: Saving user");
-    await user.save();
+      const user = await User.create({
+        name,
+        email: normalizedEmail,
+        password,
+        phone,
+        isEmailVerified: false,
+        role: "customer",
+        loyaltyTier: "Silver",
+        loyaltyPoints: 0,
+        isActive: true,
+        preferences: {
+          newsletter: false,
+          sms: false,
+          push: false
+        }
+      });
 
-    console.log("STEP 7: Generating JWT token");
-    const token = generateToken(user);
+      const verificationToken = user.generateEmailVerificationToken();
+      await user.save();
 
-    console.log("STEP 8: Preparing response");
-    
-    // Return user data with token
-    return res.status(201).json({
-      success: true,
-      message: "Registration successful. Please verify your email.",
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-      token: token,
-      isEmailVerified: user.isEmailVerified,
-      loyaltyTier: user.loyaltyTier,
-      loyaltyPoints: user.loyaltyPoints,
-      avatar: user.avatar,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt
-    });
+      const token = generateToken(user);
+      const userResponse = {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+        loyaltyTier: user.loyaltyTier,
+        loyaltyPoints: user.loyaltyPoints,
+        avatar: user.avatar,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      };
+
+      localUsersStore.set(normalizedEmail, user);
+
+      return res.status(201).json({
+        success: true,
+        message: "Registration successful. Please verify your email.",
+        token: token,
+        user: userResponse,
+        ...userResponse
+      });
+    } else {
+      // Local fallback registration
+      await initLocalStore();
+      const existing = localUsersStore.get(normalizedEmail);
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: "User already exists with this email"
+        });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const newUser = {
+        _id: `u_${Date.now()}`,
+        name,
+        email: normalizedEmail,
+        password: hashedPassword,
+        phone,
+        role: "customer",
+        loyaltyTier: "Silver",
+        loyaltyPoints: 0,
+        isEmailVerified: true,
+        isActive: true,
+        preferences: { newsletter: false, sms: false, push: false },
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      localUsersStore.set(normalizedEmail, newUser);
+      const token = generateToken(newUser);
+
+      const userResponse = {
+        _id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        role: newUser.role,
+        isEmailVerified: newUser.isEmailVerified,
+        loyaltyTier: newUser.loyaltyTier,
+        loyaltyPoints: newUser.loyaltyPoints,
+        avatar: null,
+        createdAt: newUser.createdAt,
+        updatedAt: newUser.updatedAt
+      };
+
+      return res.status(201).json({
+        success: true,
+        message: "Registration successful.",
+        token: token,
+        user: userResponse,
+        ...userResponse
+      });
+    }
 
   } catch (err) {
-    console.error("REGISTER ERROR:", err);
+    console.error("[Auth Register] ERROR:", err.message);
     return res.status(500).json({
       success: false,
       message: err.message || "Registration failed",
@@ -113,11 +170,11 @@ export const registerUser = async (req, res) => {
 // @route   POST /api/users/login
 // @access  Public
 export const loginUser = async (req, res) => {
-  console.log("🚀 LOGIN FUNCTION CALLED");
+  console.log("🚀 [Auth Login] Request received");
 
   try {
-    console.log("STEP 1: Extracting data");
     const { email, password } = req.body;
+    console.log(`[Auth Login] Email received: ${email ? email.trim() : "none"}`);
 
     if (!email || !password) {
       return res.status(400).json({
@@ -126,25 +183,55 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    console.log("STEP 2: Finding user");
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase().trim();
+    let user = null;
+    let isPasswordValid = false;
+    const isDbConnected = mongoose.connection.readyState === 1;
+
+    if (isDbConnected) {
+      try {
+        console.log("[Auth Login] Querying database for user...");
+        user = await User.findOne({ email: normalizedEmail });
+        console.log(`[Auth Login] Database lookup: ${user ? "User found" : "User not found"}`);
+      } catch (dbErr) {
+        console.warn("[Auth Login] DB lookup warning:", dbErr.message);
+      }
+    }
+
+    // Check local store fallback if DB is offline or user not in DB
     if (!user) {
+      await initLocalStore();
+      user = localUsersStore.get(normalizedEmail);
+      if (user) {
+        console.log("[Auth Login] User located in local registry");
+      }
+    }
+
+    if (!user) {
+      console.log("[Auth Login] Authentication failed: user not found");
       return res.status(401).json({
         success: false,
         message: "Invalid email or password"
       });
     }
 
-    console.log("STEP 3: Checking if account is active");
-    if (!user.isActive) {
+    if (user.isActive === false) {
       return res.status(401).json({
         success: false,
         message: "Your account has been deactivated. Please contact support."
       });
     }
 
-    console.log("STEP 4: Checking password");
-    const isPasswordValid = await user.matchPassword(password);
+    // Password comparison
+    console.log("[Auth Login] Comparing password...");
+    if (typeof user.matchPassword === "function") {
+      isPasswordValid = await user.matchPassword(password);
+    } else if (user.password) {
+      isPasswordValid = await bcrypt.compare(password, user.password);
+    }
+
+    console.log(`[Auth Login] Password match result: ${isPasswordValid ? "MATCH" : "MISMATCH"}`);
+
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
@@ -152,34 +239,40 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    console.log("STEP 5: Updating last login");
-    user.lastLogin = new Date();
-    await user.save();
+    if (isDbConnected && typeof user.save === "function") {
+      user.lastLogin = new Date();
+      await user.save().catch(() => {});
+    }
 
-    console.log("STEP 6: Generating token");
+    console.log("[Auth Login] Generating JWT...");
     const token = generateToken(user);
 
-    console.log("STEP 7: Preparing response");
-    return res.status(200).json({
-      success: true,
-      message: "Login successful",
+    const userResponse = {
       _id: user._id,
       name: user.name,
       email: user.email,
-      phone: user.phone,
-      role: user.role,
-      token: token,
-      isEmailVerified: user.isEmailVerified,
-      loyaltyTier: user.loyaltyTier,
-      loyaltyPoints: user.loyaltyPoints,
-      avatar: user.avatar,
-      preferences: user.preferences,
+      phone: user.phone || "",
+      role: user.role || "customer",
+      isEmailVerified: user.isEmailVerified ?? true,
+      loyaltyTier: user.loyaltyTier || "Silver",
+      loyaltyPoints: user.loyaltyPoints || 0,
+      avatar: user.avatar || null,
+      preferences: user.preferences || {},
       createdAt: user.createdAt,
       updatedAt: user.updatedAt
+    };
+
+    console.log("[Auth Login] Login success, returning HTTP 200");
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      token: token,
+      user: userResponse,
+      ...userResponse
     });
 
   } catch (err) {
-    console.error("LOGIN ERROR:", err);
+    console.error("[Auth Login] ERROR:", err.message);
     return res.status(500).json({
       success: false,
       message: err.message || "Login failed",
@@ -814,30 +907,48 @@ export const facebookLogin = async (req, res) => {
 // @access  Private
 export const getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const userId = req.user?._id || req.user?.id;
+    let user = null;
+
+    if (userId) {
+      try {
+        user = await User.findById(userId).select('-password');
+      } catch (dbErr) {
+        console.warn("DB user lookup warning in getCurrentUser:", dbErr.message);
+      }
+    }
+
+    if (!user && req.user) {
+      user = req.user;
+    }
     
     if (!user) {
-      return res.status(404).json({
+      return res.status(401).json({
         success: false,
         message: "User not found"
       });
     }
 
-    return res.status(200).json({
-      success: true,
-      _id: user._id,
+    const userData = {
+      _id: user._id || user.id,
       name: user.name,
       email: user.email,
-      phone: user.phone,
-      role: user.role,
-      isEmailVerified: user.isEmailVerified,
-      loyaltyTier: user.loyaltyTier,
-      loyaltyPoints: user.loyaltyPoints,
-      avatar: user.avatar,
-      preferences: user.preferences,
-      isActive: user.isActive,
+      phone: user.phone || "",
+      role: user.role || "customer",
+      isEmailVerified: user.isEmailVerified ?? true,
+      loyaltyTier: user.loyaltyTier || "Silver",
+      loyaltyPoints: user.loyaltyPoints || 0,
+      avatar: user.avatar || null,
+      preferences: user.preferences || {},
+      isActive: user.isActive ?? true,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt
+    };
+
+    return res.status(200).json({
+      success: true,
+      user: userData,
+      ...userData
     });
 
   } catch (err) {

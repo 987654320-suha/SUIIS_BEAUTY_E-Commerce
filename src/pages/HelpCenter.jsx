@@ -132,7 +132,6 @@ export default function HelpCenter() {
               color: activeTab === id ? "var(--clr-primary)" : "var(--clr-text-3)",
               borderBottom: `2px solid ${activeTab === id ? "var(--clr-primary)" : "transparent"}`,
               marginBottom: "-1px", cursor: "pointer", background: "none", border: "none",
-              borderBottom: `2px solid ${activeTab === id ? "var(--clr-primary)" : "transparent"}`,
               transition: "all 0.25s",
             }}>{label}</button>
           ))}

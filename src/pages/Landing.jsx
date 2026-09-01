@@ -46,6 +46,8 @@ export default function Landing() {
     if (result.success) {
       toast.success("Welcome back! 🎉");
       navigate("/");
+    } else {
+      toast.error(result.error || "Invalid credentials. Please check your email and password.");
     }
   };
 

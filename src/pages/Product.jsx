@@ -343,7 +343,7 @@ export default function ProductDetail() {
         <div style={{ marginTop: "80px", borderTop: "1px solid var(--clr-divider)", paddingTop: "60px" }}>
           <div style={{ display: "flex", borderBottom: "1px solid var(--clr-divider)", marginBottom: "36px", overflowX: "auto" }}>
             {TABS.map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: "14px 24px", fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 500, letterSpacing: "0.15em", textTransform: "uppercase", color: activeTab === tab ? "var(--clr-primary)" : "var(--clr-text-3)", borderBottom: `2px solid ${activeTab === tab ? "var(--clr-primary)" : "transparent"}`, marginBottom: "-1px", cursor: "pointer", transition: "all 0.25s", background: "none", border: "none", borderBottom: `2px solid ${activeTab === tab ? "var(--clr-primary)" : "transparent"}`, whiteSpace: "nowrap" }}>{tab}</button>
+              <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: "14px 24px", fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 500, letterSpacing: "0.15em", textTransform: "uppercase", color: activeTab === tab ? "var(--clr-primary)" : "var(--clr-text-3)", marginBottom: "-1px", cursor: "pointer", transition: "all 0.25s", background: "none", border: "none", borderBottom: `2px solid ${activeTab === tab ? "var(--clr-primary)" : "transparent"}`, whiteSpace: "nowrap" }}>{tab}</button>
             ))}
           </div>
           <div style={{ maxWidth: "720px" }}>{tabContent[activeTab]}</div>

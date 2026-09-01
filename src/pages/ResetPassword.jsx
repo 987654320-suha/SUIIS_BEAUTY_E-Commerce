@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import apiClient from "../api/apiClient";
 import { useToast } from "../context/ToastContext";
 
 export default function ResetPassword() {
@@ -27,7 +27,7 @@ export default function ResetPassword() {
     
     setLoading(true);
     try {
-      const response = await axios.post(`http://localhost:5000/api/auth/reset-password/${token}`, { password });
+      const response = await apiClient.put(`/api/auth/reset-password/${token}`, { password });
       
       if (response.data.success) {
         setSuccess(true);
