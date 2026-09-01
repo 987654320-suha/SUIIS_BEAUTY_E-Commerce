@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import axios from "axios";
 
 export default function Landing() {
   const [isLogin, setIsLogin] = useState(true);

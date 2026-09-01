@@ -1,9 +1,12 @@
 import axios from "axios";
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// Standardized API Base URL for local development and Render production
+const rawBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+export const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
 });
 
 // Request Interceptor: automatically attach Authorization header
